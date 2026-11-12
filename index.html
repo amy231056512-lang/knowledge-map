@@ -1,0 +1,469 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>策略長 關聯 mapping</title>
+<style>
+:root{--bg:#fafaf7;--fg:#222;--mu:#6b6b66;--ln:#d8d8d0;--pn:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1b1b19;--fg:#e8e8e2;--mu:#a0a09a;--ln:#3a3a36;--pn:#242421}}
+:root[data-theme="dark"]{--bg:#1b1b19;--fg:#e8e8e2;--mu:#a0a09a;--ln:#3a3a36;--pn:#242421}
+*,*::before,*::after{box-sizing:inherit}
+html,body{margin:0;padding:0;width:100%;height:100%;font-family:'PingFang TC','Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:var(--fg);overflow:hidden}
+#bar{display:flex;align-items:center;gap:10px;padding:6px 12px;background:var(--pn);border-bottom:1px solid var(--ln);flex-shrink:0;flex-wrap:wrap;min-height:38px}
+#bar h1{margin:0;font-size:13px;font-weight:700;white-space:nowrap;color:var(--fg)}
+.sep{color:var(--ln);user-select:none}
+.ctrl{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--mu);cursor:pointer;white-space:nowrap}
+.ctrl input{cursor:pointer;accent-color:#3b82c4}
+select{font-size:12px;border:1px solid var(--ln);border-radius:4px;padding:2px 5px;background:var(--pn);color:var(--fg);cursor:pointer}
+#main{display:flex;flex:1;overflow:hidden;height:calc(100vh - 38px)}
+#g{flex:1;overflow:hidden;position:relative}
+svg{width:100%;height:100%;display:block}
+.node circle{cursor:pointer;stroke:#fff;stroke-width:1.2px;transition:opacity .2s}
+.node text{pointer-events:none;font-size:11px;fill:var(--fg);text-anchor:middle;dominant-baseline:central}
+.link{stroke-opacity:.7;fill:none;transition:opacity .2s}
+.link-label{font-size:10px;fill:var(--mu);pointer-events:none;text-anchor:middle}
+.faded{opacity:.12 !important}
+#side{width:320px;min-width:320px;border-left:1px solid var(--ln);overflow-y:auto;padding:14px 16px;font-size:13px;background:var(--pn);flex-shrink:0}
+#side h2{margin:0 0 8px;font-size:15px;font-weight:700}
+#side .meta{color:var(--mu);font-size:12px;margin-bottom:10px;line-height:1.6}
+#side .conn-list{margin:0;padding:0;list-style:none}
+#side .conn-list li{padding:5px 0;border-bottom:1px solid var(--ln);font-size:12px;line-height:1.5}
+#side .conn-list li:last-child{border:none}
+#side .tag{display:inline-block;border-radius:3px;padding:1px 6px;font-size:10px;margin-right:4px;background:var(--ln);color:var(--mu)}
+#hint{font-size:12px;color:var(--mu);line-height:1.6}
+#hint b{color:var(--fg)}
+.legend-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:middle}
+</style>
+</head><body>
+<div id="bar">
+  <h1>策略長 知識關聯圖</h1>
+  <span class="sep">|</span>
+  <label class="ctrl"><input type="checkbox" id="chkLabels" checked> 顯示標籤</label>
+  <span class="sep">|</span>
+  <label class="ctrl"><input type="checkbox" id="chkRel"> 連線標記</label>
+  <span class="sep">|</span>
+  <label class="ctrl">視角：<select id="selAxis">
+    <option value="all">全部</option>
+    <option value="x1">X1 知識與學習</option>
+    <option value="x2">X2 工作方法</option>
+    <option value="x3">X3 時間規劃</option>
+    <option value="x4">X4 情緒與態度</option>
+    <option value="x5">X5 人際關係</option>
+  </select></label>
+  <span class="sep">|</span>
+  <label class="ctrl">主題：<select id="selCh">
+    <option value="all">全部</option>
+    <option value="1">一 專業知識</option>
+    <option value="2">二 最佳方法</option>
+    <option value="3">三 工作流程</option>
+    <option value="4">四 輕重緩急</option>
+    <option value="5">五 時間規劃</option>
+    <option value="6">六 待辦清單</option>
+    <option value="7">七 專注穩定</option>
+    <option value="8">八 持續學習</option>
+    <option value="11">貳之一 組織角度</option>
+    <option value="9">貳之二 主管關係</option>
+    <option value="10">貳之三 同事關係</option>
+  </select></label>
+  <span class="sep">|</span>
+  <button id="btnTheme" style="font-size:12px;border:1px solid var(--ln);border-radius:4px;padding:2px 7px;background:var(--pn);color:var(--mu);cursor:pointer">🌙</button>
+</div>
+<div id="main">
+  <div id="g"><svg id="svg"><g id="zoomG"></g></svg></div>
+  <div id="side">
+    <div id="hint">
+      <b>使用說明</b><br>
+      每個圓是一個概念、做法或觀察；每條線是兩者之間的一種關聯。目的是看出分散在不同訪談的內容，哪些其實相連。<br><br>
+      <b>閱讀方法</b><br>
+      選「視角」看某條軸線串起哪些內容；選「主題」看某書章節與其他章的連結。圓越大＝連線越多。<br><br>
+      <b>操作</b><br>
+      點圓查看來源與所有關聯；滑過圓會高亮鄰居；拖曳移動、滾輪縮放。<br><br>
+      <b>使用時請注意</b><br>
+      連線多只代表整理中連得多，不代表策略長最重視。所有連線直接源自逐字稿，依訪談段落標注來源。<br><br>
+      <b>節點顏色 = 章節</b><br>
+      <span class="legend-dot" style="background:#4f7cba"></span>一 專業知識<br>
+      <span class="legend-dot" style="background:#3a9e73"></span>二 最佳方法<br>
+      <span class="legend-dot" style="background:#c8742a"></span>三 工作流程<br>
+      <span class="legend-dot" style="background:#9b59b6"></span>四 輕重緩急<br>
+      <span class="legend-dot" style="background:#c0392b"></span>五 時間規劃<br>
+      <span class="legend-dot" style="background:#16a085"></span>六 待辦清單<br>
+      <span class="legend-dot" style="background:#2980b9"></span>七 專注穩定<br>
+      <span class="legend-dot" style="background:#8e6b3e"></span>八 持續學習<br>
+      <span class="legend-dot" style="background:#1abc9c"></span>貳之一 組織角度<br>
+      <span class="legend-dot" style="background:#7f8c8d"></span>貳之二 主管關係<br>
+      <span class="legend-dot" style="background:#d35400"></span>貳之三 同事關係<br><br>
+      <b>連線</b>：節點間的關聯，直接源自逐字稿
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/d3@7.8.5/dist/d3.min.js"></script>
+<script>
+// ── 節點資料 [id, name, desc, src(章節段), ch(1-10), axis]
+// axis: x1=知識學習 x2=工作方法 x3=時間規劃 x4=情緒態度 x5=人際關係
+const RAW_N = [
+["n01","專業知識基礎","先找入門書，建立整體概念再深入，「知識有很多層次，要先對一個主題有基本認識，才能進一步學習。」","一之一",1,"x1"],
+["n02","入門書閱讀法","「我會先找一本介紹性的書。就像學中文要先學注音，你必須先從最基礎的地方開始。」","一之一",1,"x1"],
+["n03","多元知識來源","報紙、雜誌、網路、同事、主管都是知識來源，「我現在有很多管道可以取得知識。」","一之一",1,"x1"],
+["n04","技能與實作","知識要能應用，光看書不夠，「真正的技能，需要透過實際操作才能學會。」","一之二",1,"x1"],
+["n05","能力內部化","從依賴外部專家到自己掌握，「我希望所有的能力都能內部化，從80%依賴外部到只需20%。」","貳之三",10,"x2"],
+["n06","從小到大思考","先看小問題，再看大局，「我先看小問題，再去看大問題，這樣可以幫助我更全面地理解情況。」","貳之一之三",11,"x2"],
+["n07","整體視野","能看到全局，不只是自己的部分，「一個人如果只看到自己的工作，就很難做好整體的規劃。」","貳之一之三",11,"x2"],
+["n08","組織工作方式","有系統地組織工作，「在開始做事情之前，先做好組織和規劃，是非常重要的。」","二之二",2,"x2"],
+["n09","找尋最佳方法","不滿足於現有做法，持續改進，「我一直在問自己：有沒有更好的方法？」","二之一",2,"x2"],
+["n10","分析問題習慣","面對問題先分析後行動，「我習慣先把問題分析清楚，再決定怎麼做。」","二之一",2,"x2"],
+["n11","先規劃再執行","避免盲點，「在開始做一件事情之前，先把流程想清楚，可以幫助我們減少盲點。」","三之一",3,"x2"],
+["n12","避免依賴習慣","不能光靠經驗，「很多盲點來自於我們沒有認真思考，只是憑經驗直接帶過。」","三之一",3,"x2"],
+["n13","工作流程規劃","先思考步驟與順序，「如果沒有先想清楚流程，就很難確保工作的先後順序是正確的。」","三之一",3,"x2"],
+["n14","跨部門合作流程","多部門需要共同時間表，「如果是需要團隊合作、跨部門合作的工作，大家一定要對流程有共識。」","三之一",3,"x2"],
+["n15","共同時間表","建立讓所有人明白進度的時間表，「每個部門知道自己在什麼時間點需要完成哪些成果。」","三之一",3,"x3"],
+["n16","能力確認","開始前確認自己有足夠能力，「我不會是一個沒準備好就上戰場的士兵。」","三之一",3,"x2"],
+["n17","輕重緩急判斷","重要的事情要先做，「重要的部分要做到非常好；次要的部分做到足夠好就可以。」","四之一",4,"x2"],
+["n18","困難的事先做","「困難的事情先做，容易的事情後做。這是我一直以來的習慣。」","四之三",4,"x2"],
+["n19","及早啟動","不要等到最後才開始，「我不喜歡等到最後一分鐘才開始做事。」","四之二",4,"x2"],
+["n20","時間預估拆解","把工作拆細，預估每項所需時間，「拆解每個小項目需要多少時間完成」","五之一",5,"x3"],
+["n21","時間重要性判斷","先判斷工作對公司的重要性，「重要性越高的事情，我們就要分配越充足的時間去完成它。」","五之一",5,"x3"],
+["n22","Deadline意識","時間有限，「既然時間有限，你就要決定時間怎麼用。」","五之一",5,"x3"],
+["n23","預判能力","能預判是掌握工作程度的指標，「能不能做預判本身就是檢驗你對工作掌握程度的方法。」","五之一",5,"x2"],
+["n24","加班應對","預估失準時的應對，「就加班啊。因為地球不會因為你預估錯誤就停止運轉。」","五之一",5,"x4"],
+["n25","階段性目標","不從零到百，分階段設定，「先做到60分；再從60分做到80分；最後再從80分做到100分。」","五之一",5,"x3"],
+["n26","時程計畫書","用文字敘述寫成的計畫，「我會先做一個時間表，譬如說今天是9月1號，假設我希望在12月31號完成某件事情。」","五之二",5,"x3"],
+["n27","行事曆整合","把工作放進行事曆，「我會先跟同事約好每週要開幾次會，自己要做的事情，也會安排進時間表裡面。」","五之二",5,"x3"],
+["n28","重要但不急迫","留時間處理策略性事務，「今天做跟下個禮拜做，影響不一定很大；但如果一直都不做，最後影響就會很大。」","五之二",5,"x3"],
+["n29","化被動為主動","主動規劃，不等待工作被指派，「他其實一定知道哪些工作是經常要做的。」","五之三",5,"x2"],
+["n30","待辦清單建立","每天記錄待辦事項，「我應該是來公司上班的第一天就開始做這件事情了。」","六之一",6,"x3"],
+["n31","待辦清單更新","定期檢視與更新，「最好是前一天晚上就看一下第二天的待辦清單，重新檢視一下。」","六之二",6,"x3"],
+["n32","待辦保鮮期","急迫的事不能久留，「待辦事項有它的保鮮期。」","六之二",6,"x3"],
+["n33","專注專心","排除干擾，「我在做事情的時候，我非常非常地專心。」","七之一",7,"x4"],
+["n34","單一任務處理","一次只做一件事，「我不太喜歡同時做很多件事情，因為這樣容易分心。」","七之一",7,"x4"],
+["n35","情緒平和","保持穩定情緒，「情緒穩定，是做好工作很重要的基礎。」","七之二",7,"x4"],
+["n36","壓力管理","面對壓力的方式，「我會去找我的家人聊天，或是去打球，這樣可以讓我的心情好一點。」","七之二",7,"x4"],
+["n37","廣泛閱讀","廣泛閱讀增加知識廣度，「我非常喜歡閱讀，不限定主題，什麼書都看。」","八之二",8,"x1"],
+["n38","持續學習習慣","工作後繼續學習，「學習不應該只是在學校裡面，工作之後也需要繼續學習。」","八之一",8,"x1"],
+["n39","讀書方法","快速找到重點，「我不是每本書都從頭讀到尾，我會先看目錄，找到我最需要的部分。」","八之二",8,"x1"],
+["n40","主管關係建立","主動了解主管期待，「我會主動去找主管，了解他對我的工作有什麼期待。」","貳之二",9,"x5"],
+["n41","主管溝通方式","有準備地報告，「即使只是三分鐘的談話，我也會先稍微整理一下重點，才過去跟他報告。」","三之一",9,"x5"],
+["n42","向上管理","了解主管的思考方式，「我覺得了解主管的思維模式，對工作幫助很大。」","貳之二",9,"x5"],
+["n43","尋求主管支持","適時請求主管協助，「有些事情是我一個人做不到的，我會去請求主管的支持。」","貳之二",9,"x5"],
+["n44","同事關係","建立良好同事關係的基礎，「讓人看出我們的好性格：殷勤不懶惰、樂於幫助人、不堅持自己的意見。」","貳之三",10,"x5"],
+["n45","向同事學習","願意請教同事，「我不會覺得我不能跟人家請教。」","貳之三",10,"x5"],
+["n46","請教前準備","請教前先做功課，「自己先去尋求答案，這是要先做的功課。」","貳之三",10,"x5"],
+["n47","幫助同事","主動協助同事，「我就會花時間告訴他怎麼做簡報。」","貳之三",10,"x5"],
+["n48","工作態度","把工作當學習，「我們工作一個月的時數裡面，其實可能只有50%或60%是我們本來就會做的，其他的時間就是用來學習的時間。」","貳之三",10,"x4"],
+["n49","關心同事狀況","主動了解同事困難，「有時候同事會很不好意思佔用主管的時間，那我們就需要主動一點去了解他的工作是不是真的很困難。」","貳之三",10,"x5"],
+["n50","部門績效","部門表現好，主管受益，「同事表現好，絕對不可能只有同事得到肯定而我沒有。」","貳之三",10,"x5"],
+["n51","準備會議","會前讀資料，「我一定會先把會議資料讀過，尤其是第一次參加某個會議，我會把資料讀得非常仔細。」","三之一",3,"x2"],
+["n52","設立子公司案例","多部門合作訂共同時間表的實例，「在海外設立子公司的時候，就一定會訂一個子公司成立的目標日期。」","三之一",3,"x3"],
+["n53","上市時間表案例","上市工作的緊湊時間管理，「從新加坡下市到台灣興櫃，不要超過三個月。」","五之一",5,"x3"],
+["n54","媒體計畫案例","18個月媒體計畫的階段執行，「我替公關部規劃了一個18個月的媒體計畫。」","五之一",5,"x3"],
+["n55","工作方法論","對例行工作發展出一套方法論，「有了方法論，你就能養成一種習慣去分析工作內容，並依照工作經驗加上判斷來決定工作順序與時間分配。」","二之二",2,"x2"],
+["n56","把未知縮小為已知","面對新工作先縮小未知範圍，「第一步當然是盡量把未知的領域縮小。從外部資源去讓未知減少；如果外部資源不夠，就從自己的努力把未知變成已知。」","二之二",2,"x2"],
+["n57","洞見判斷","區分一般資料與產業洞見，「哪些資訊屬於Insights——真正對這個產業熟悉的人所提出的觀點或分析，可以節省我們自己做判斷的時間，那種資訊就非常有價值。」","貳之一之三",11,"x2"],
+["n58","持續對齊校準","與主管定期對齊工作目標，「我今天做事情，是以我自己為標準來進行？還是我會想到主管能不能因此得到幫助、比較容易做決定？」","貳之一之三",11,"x5"],
+["n59","工具迭代思維","AI時代重新設計工作流程，「我要把AI當作工作夥伴，直接告訴它我最後要產出什麼。工具在改變的時候，我們的工作方式與思考邏輯是不是也要做些改變？」","貳之一之三",11,"x2"],
+["n60","學習判斷輕重","學習不能盲目，要判斷哪些重要多花時間、哪些可以放過，「不重要的就放過它沒關係。有一些好像是潮流，但事實上沒有持續發展的價值，就不要太關心。」","八之一",8,"x1"],
+["n61","強迫學習機制","透過外部結構強迫學習，「你為了拿到那個學位，一定要把課修完、一定要考試，我覺得這樣比較有效。」","八之一",8,"x1"],
+["n62","學習態度非工具性","學習是充實自己的態度而非工具性目的，「太工具性地思考這件事情，第一是做不完的，而且你也沒有辦法應付未來的一些變化。」","八之一",8,"x1"],
+["n63","觀察式學習","學習是一種觀察，「你保持一個學習的態度，看看你的同事、朋友，有誰在某方面表現出來的特質讓你很欣賞，那你就去學習。」","八之一",8,"x1"],
+["n64","定期檢視工作方法","常常檢視做事的目標、方法與使用的資料是否仍然有效，「我們要常常檢視工作內容與工作方法，才能讓工作真正達到原本的設計。」","貳之一之一",11,"x2"],
+["n65","數據品質判斷","判斷數字管理中數據的含金量與來源，「不是每個數字都具有同樣的價值，你怎麼樣給不同的數字不同的權重，好讓你產出一個最有價值的決定？」","貳之一之一",11,"x2"],
+["n66","流程最佳化思維","追求更少步驟達到足夠好的效益，「如果10個步驟是100分，我這個工作一定要100分嗎？還是8個步驟達到90分，幫公司省了錢、省了人力，產生的結果效益反而是更好的？」","貳之一之一",11,"x2"]
+];
+
+// ── 邊資料 [source, rel, target, src, note]
+// 全部統一顏色，直接源自逐字稿
+const RAW_E = [
+["n01","奠定","n02","一之一","先有整體概念才能深入"],
+["n02","擴展至","n03","一之一","入門後需多元來源補充"],
+["n01","應用為","n04","一之二","知識最終要轉化為技能"],
+["n04","實踐形成","n05","貳之三","技能應用後逐步內部化"],
+["n03","支撐","n38","八之一","多元來源強化持續學習"],
+["n37","深化","n01","八之二","廣泛閱讀豐富知識基礎"],
+["n39","提升效率","n38","八之二","讀書方法使學習更有效"],
+["n38","帶來","n04","八之一","學習習慣促進技能精進"],
+["n06","連結","n07","二之三","小問題視角擴展為整體視野"],
+["n07","指導","n08","二之二","整體視野指導工作組織"],
+["n09","驅動","n10","二之一","尋求最佳方法驅動分析習慣"],
+["n10","引導","n11","三之一","分析習慣引導先規劃"],
+["n11","避免","n12","三之一","規劃習慣避免依賴習慣"],
+["n11","產出","n13","三之一","規劃形成具體工作流程"],
+["n13","擴展為","n14","三之一","個人流程擴展為跨部門流程"],
+["n14","需要","n15","三之一","跨部門合作需共同時間表"],
+["n15","案例為","n52","三之一","子公司設立是共同時間表的案例"],
+["n16","配合","n13","三之一","能力確認配合流程規劃"],
+["n11","要求","n16","三之一","先規劃才能確認自身能力"],
+["n17","決定","n18","四之一","輕重緩急判斷決定先做困難事"],
+["n18","結合","n19","四之二","困難先做結合及早啟動"],
+["n17","應用於","n20","五之一","輕重緩急判斷應用於時間拆解"],
+["n20","基於","n21","五之一","時間拆解需先判斷重要性"],
+["n21","關聯","n22","五之一","重要性判斷配合Deadline意識"],
+["n20","培養","n23","五之一","拆解能力培養預判能力"],
+["n23","面對","n24","五之一","預判失準時要有加班應對"],
+["n25","整合入","n26","五之一","階段目標整合進計畫書"],
+["n26","放入","n27","五之二","計畫書內容放入行事曆"],
+["n27","保留","n28","五之二","行事曆保留重要但不急迫的時間"],
+["n29","搭配","n30","五之三","主動規劃搭配待辦清單"],
+["n30","需要","n31","六之二","待辦清單需定期更新"],
+["n31","意識","n32","六之二","更新時要意識保鮮期"],
+["n53","體現","n22","五之一","上市案例體現Deadline意識"],
+["n53","說明","n24","五之一","上市案例說明加班應對"],
+["n54","展示","n25","五之一","媒體計畫展示階段性目標"],
+["n54","使用","n26","五之二","媒體計畫使用時程計畫書"],
+["n33","促進","n34","七之一","專注形成單一任務習慣"],
+["n35","支撐","n33","七之二","情緒平和支撐專注能力"],
+["n36","維持","n35","七之二","壓力管理維持情緒平和"],
+["n35","穩定","n10","七之二","情緒穩定有助於分析問題"],
+["n40","引導","n41","貳之二","主管關係引導溝通方式"],
+["n41","展現於","n51","三之一","主管溝通方式展現在準備會議"],
+["n42","配合","n40","貳之二","了解主管思維配合關係建立"],
+["n43","支持","n42","貳之二","主管支持依賴向上管理"],
+["n44","基礎","n45","貳之三","好性格是願意學習的基礎"],
+["n45","需要","n46","貳之三","向同事學習前需先準備"],
+["n46","提升","n10","貳之三","準備工作提升問對問題能力"],
+["n47","體現","n44","貳之三","幫助同事體現好性格"],
+["n47","培養","n50","貳之三","幫助同事培養部門績效"],
+["n48","支持","n47","貳之三","工作態度支持幫助同事的動力"],
+["n49","結合","n47","貳之三","關心同事狀況結合實際幫助"],
+["n50","激勵","n09","貳之三","部門績效激勵尋求最佳方法"],
+["n05","目標","n07","貳之三","能力內部化使視野更整體"],
+["n08","配合","n15","三之一","工作組織方式配合時間表"],
+["n51","支援","n07","三之一","會前準備支援整體視野"],
+["n08","發展為","n55","二之二","組織工作方式發展出具體方法論"],
+["n55","應用於","n12","二之二","方法論幫助避免依賴習慣"],
+["n56","配合","n01","貳之一之二","縮小未知需要知識基礎"],
+["n57","深化","n56","貳之一之二","洞見判斷使縮小未知更有效"],
+["n57","提升","n10","貳之一之二","洞見判斷提升分析問題品質"],
+["n56","支持","n16","貳之一之二","縮小未知有助確認自身能力"],
+["n58","強化","n42","貳之一之三","持續對齊校準強化向上管理"],
+["n58","配合","n06","貳之一之三","對齊校準配合從小到大思考"],
+["n59","延伸","n09","貳之一之三","工具迭代思維延伸尋求最佳方法"],
+["n59","重塑","n13","貳之一之三","AI時代工具迭代重塑工作流程"],
+["n60","深化","n38","八之一","學習判斷輕重深化持續學習習慣"],
+["n60","配合","n17","八之一","判斷學習輕重呼應輕重緩急判斷"],
+["n61","支持","n38","八之一","強迫學習機制支持持續學習習慣"],
+["n62","延伸","n38","八之一","非工具性學習態度是持續學習的精神核心"],
+["n62","連結","n48","八之一","把學習當態度呼應把工作當學習"],
+["n63","補充","n37","八之一","觀察式學習補充廣泛閱讀的方式"],
+["n63","連結","n03","八之一","觀察同事也是多元知識來源的一種"],
+["n64","深化","n09","貳之一之一","定期檢視工作方法是持續找尋最佳方法的落實"],
+["n64","應用","n55","貳之一之一","定期檢視驅動方法論持續更新"],
+["n65","配合","n64","貳之一之一","數據品質判斷是定期檢視的核心內容"],
+["n65","提升","n10","貳之一之一","數據品質判斷提升分析問題品質"],
+["n66","延伸","n64","貳之一之一","流程最佳化是定期檢視的具體行動"],
+["n66","連結","n09","貳之一之一","流程最佳化思維呼應找尋最佳方法"]
+];
+
+// ── Axis 分組定義
+const AXIS = {
+  x1: new Set(["n01","n02","n03","n04","n37","n38","n39","n05","n60","n61","n62","n63"]),
+  x2: new Set(["n06","n07","n08","n09","n10","n11","n12","n13","n16","n17","n18","n19","n23","n29","n51","n55","n56","n57","n59","n64","n65","n66"]),
+  x3: new Set(["n15","n20","n21","n22","n25","n26","n27","n28","n30","n31","n32","n52","n53","n54"]),
+  x4: new Set(["n24","n33","n34","n35","n36","n48"]),
+  x5: new Set(["n40","n41","n42","n43","n44","n45","n46","n47","n49","n50","n12","n14","n58"])
+};
+
+const CH_COL = {
+  1:"#4f7cba",2:"#3a9e73",3:"#c8742a",4:"#9b59b6",5:"#c0392b",
+  6:"#16a085",7:"#2980b9",8:"#8e6b3e",9:"#7f8c8d",10:"#d35400",11:"#1abc9c"
+};
+const EDGE_COLOR = "#999";
+
+let nodes, links, activeAxis="all", activeCh="all";
+let sim, svg, zoomG, linkSel, nodeSel, labelSel, relSel;
+let selectedNode = null;
+let showLabels = true, showRel = false;
+
+function buildGraph() {
+  // filter nodes
+  let nodeSet = new Set(RAW_N.map(d=>d[0]));
+  if (activeAxis !== "all") nodeSet = new Set([...nodeSet].filter(id => AXIS[activeAxis].has(id)));
+  if (activeCh !== "all") nodeSet = new Set([...nodeSet].filter(id => {
+    const n = RAW_N.find(r=>r[0]===id); return n && String(n[4]) === activeCh;
+  }));
+  // filter edges to both endpoints in nodeSet
+  const edgeData = RAW_E.filter(e => nodeSet.has(e[0]) && nodeSet.has(e[2]));
+
+  // build nodes with degree
+  const degMap = {};
+  edgeData.forEach(e => {
+    degMap[e[0]] = (degMap[e[0]]||0)+1;
+    degMap[e[2]] = (degMap[e[2]]||0)+1;
+  });
+  nodes = RAW_N.filter(d=>nodeSet.has(d[0])).map(d => ({
+    id:d[0], name:d[1], desc:d[2], src:d[3], ch:d[4], axis:d[5],
+    deg: degMap[d[0]]||0
+  }));
+  const maxDeg = Math.max(1, ...nodes.map(d=>d.deg));
+  nodes.forEach(d => { d.r = 6 + 22*Math.pow(d.deg/maxDeg, .8); });
+
+  links = edgeData.map(e => ({
+    source:e[0], rel:e[1], target:e[2], src:e[3], note:e[4]
+  }));
+
+  render();
+}
+
+function render() {
+  const svgEl = document.getElementById("svg");
+  const W = svgEl.clientWidth || 900, H = svgEl.clientHeight || 600;
+  d3.select("#zoomG").selectAll("*").remove();
+
+  linkSel = d3.select("#zoomG").append("g").attr("class","links")
+    .selectAll("line").data(links).join("line")
+    .attr("class","link")
+    .attr("stroke", EDGE_COLOR)
+    .attr("stroke-width", 1.4)
+    .attr("marker-end","url(#arr)");
+
+  relSel = d3.select("#zoomG").append("g").attr("class","rels")
+    .selectAll("text").data(links).join("text")
+    .attr("class","link-label")
+    .text(d=>d.rel)
+    .style("display", showRel ? "block":"none");
+
+  const nodeG = d3.select("#zoomG").append("g").attr("class","nodes")
+    .selectAll("g").data(nodes).join("g").attr("class","node")
+    .call(d3.drag()
+      .on("start",(e,d)=>{if(!e.active)sim.alphaTarget(.3).restart();d.fx=d.x;d.fy=d.y})
+      .on("drag",(e,d)=>{d.fx=e.x;d.fy=e.y})
+      .on("end",(e,d)=>{if(!e.active)sim.alphaTarget(0);d.fx=null;d.fy=null}))
+    .on("click",(e,d)=>{e.stopPropagation();selectNode(d)});
+
+  nodeG.append("circle")
+    .attr("r",d=>d.r)
+    .attr("fill",d=>CH_COL[d.ch]||"#aaa");
+
+  labelSel = nodeG.append("text").text(d=>d.name)
+    .attr("y",d=>d.r+12)
+    .style("display",showLabels?"block":"none");
+
+  nodeSel = nodeG;
+
+  // defs arrow
+  d3.select("#svg").select("defs").remove();
+  d3.select("#svg").append("defs").append("marker")
+    .attr("id","arr").attr("viewBox","0 -4 8 8").attr("refX",8).attr("refY",0)
+    .attr("markerWidth",6).attr("markerHeight",6).attr("orient","auto")
+    .append("path").attr("d","M0,-4L8,0L0,4").attr("fill",EDGE_COLOR);
+
+  sim = d3.forceSimulation(nodes)
+    .force("link", d3.forceLink(links).id(d=>d.id).distance(d=>{
+      const s = nodes.find(n=>n.id===(d.source.id||d.source));
+      const t = nodes.find(n=>n.id===(d.target.id||d.target));
+      return 60 + ((s?s.r:10)+(t?t.r:10))*1.1;
+    }))
+    .force("charge", d3.forceManyBody().strength(-280))
+    .force("center", d3.forceCenter(W/2, H/2))
+    .force("collide", d3.forceCollide().radius(d=>d.r+14))
+    .on("tick", ticked);
+
+  // zoom
+  const zoom = d3.zoom().scaleExtent([.1,4]).on("zoom",e=>{
+    d3.select("#zoomG").attr("transform",e.transform);
+  });
+  d3.select("#svg").call(zoom);
+  d3.select("#svg").on("click",()=>{ selectedNode=null; clearHighlight(); showHint(); });
+}
+
+function ticked() {
+  linkSel
+    .attr("x1",d=>d.source.x).attr("y1",d=>d.source.y)
+    .attr("x2",d=>{
+      const dx=d.target.x-d.source.x, dy=d.target.y-d.source.y;
+      const dist=Math.sqrt(dx*dx+dy*dy)||1;
+      return d.target.x - dx/dist*(d.target.r+2);
+    })
+    .attr("y2",d=>{
+      const dx=d.target.x-d.source.x, dy=d.target.y-d.source.y;
+      const dist=Math.sqrt(dx*dx+dy*dy)||1;
+      return d.target.y - dy/dist*(d.target.r+2);
+    });
+  relSel
+    .attr("x",d=>(d.source.x+d.target.x)/2)
+    .attr("y",d=>(d.source.y+d.target.y)/2);
+  nodeSel.attr("transform",d=>`translate(${d.x},${d.y})`);
+}
+
+function selectNode(d) {
+  selectedNode = d;
+  // find neighbors
+  const neighborIds = new Set();
+  links.forEach(l=>{
+    const sid = l.source.id||l.source, tid = l.target.id||l.target;
+    if(sid===d.id) neighborIds.add(tid);
+    if(tid===d.id) neighborIds.add(sid);
+  });
+  nodeSel.selectAll("circle").classed("faded", n => n.id!==d.id && !neighborIds.has(n.id));
+  linkSel.classed("faded", l=>{
+    const sid=l.source.id||l.source, tid=l.target.id||l.target;
+    return sid!==d.id && tid!==d.id;
+  });
+  showDetail(d, neighborIds);
+}
+
+function clearHighlight() {
+  nodeSel && nodeSel.selectAll("circle").classed("faded",false);
+  linkSel && linkSel.classed("faded",false);
+}
+
+function showHint() {
+  document.getElementById("hint").style.display = "";
+  document.getElementById("detail-panel") && (document.getElementById("detail-panel").style.display="none");
+}
+
+function showDetail(d, neighborIds) {
+  const side = document.getElementById("side");
+  document.getElementById("hint").style.display = "none";
+
+  let detEl = document.getElementById("detail-panel");
+  if(!detEl){ detEl=document.createElement("div"); detEl.id="detail-panel"; side.appendChild(detEl); }
+  detEl.style.display="";
+
+  // connected edges
+  const outLinks = links.filter(l=>(l.source.id||l.source)===d.id);
+  const inLinks = links.filter(l=>(l.target.id||l.target)===d.id);
+
+  const chName = ["","一 專業知識","二 最佳方法","三 工作流程","四 輕重緩急","五 時間規劃","六 待辦清單","七 專注穩定","八 持續學習","貳之二 主管關係","貳之三 同事關係","貳之一 組織角度"];
+
+  detEl.innerHTML = `
+    <h2>${d.name}</h2>
+    <div class="meta">章節：${chName[d.ch]||d.ch} ｜ 段落：${d.src} ｜ 連結數：${d.deg}</div>
+    <div style="margin-bottom:10px;font-size:13px;line-height:1.7;color:var(--fg)">${d.desc}</div>
+    ${outLinks.length?`<div style="font-size:12px;font-weight:600;margin-bottom:4px;color:var(--mu)">→ 連出（${outLinks.length}）</div>
+    <ul class="conn-list">${outLinks.map(l=>{
+      const tid=l.target.id||l.target;
+      const tn=nodes.find(n=>n.id===tid);
+      return `<li><span class="tag">${l.rel}</span><b>${tn?tn.name:tid}</b><br><span style="color:var(--mu)">${l.note}</span></li>`;
+    }).join("")}</ul>`:""}
+    ${inLinks.length?`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;color:var(--mu)">← 連入（${inLinks.length}）</div>
+    <ul class="conn-list">${inLinks.map(l=>{
+      const sid=l.source.id||l.source;
+      const sn=nodes.find(n=>n.id===sid);
+      return `<li><span class="tag">${l.rel}</span><b>${sn?sn.name:sid}</b><br><span style="color:var(--mu)">${l.note}</span></li>`;
+    }).join("")}</ul>`:""}
+  `;
+}
+
+// ── 控制項
+document.getElementById("chkLabels").addEventListener("change",e=>{
+  showLabels=e.target.checked;
+  labelSel && labelSel.style("display",showLabels?"block":"none");
+});
+document.getElementById("chkRel").addEventListener("change",e=>{
+  showRel=e.target.checked;
+  relSel && relSel.style("display",showRel?"block":"none");
+});
+document.getElementById("selAxis").addEventListener("change",e=>{
+  activeAxis=e.target.value; selectedNode=null; clearHighlight(); showHint();
+  buildGraph();
+});
+document.getElementById("selCh").addEventListener("change",e=>{
+  activeCh=e.target.value; selectedNode=null; clearHighlight(); showHint();
+  buildGraph();
+});
+document.getElementById("btnTheme").addEventListener("click",()=>{
+  const root=document.documentElement;
+  const cur=root.getAttribute("data-theme");
+  root.setAttribute("data-theme", cur==="dark"?"light":"dark");
+});
+
+// ── 初始化
+document.getElementById("hint").style.display="";
+buildGraph();
+</script>
+</body></html>
